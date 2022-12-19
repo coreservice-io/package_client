@@ -22,14 +22,14 @@ type PackageClient struct {
 	to_stop                  chan struct{}
 	auto_update_running      bool
 	auto_update_running_lock sync.Mutex
-	auto_update_func         func(*PackageClient, *Msg_resp_app_version, error)
+	auto_update_func         func(*PackageClient, *Msg_resp_app_version, error) bool
 	auto_update_log_callback func(logstr string)
 }
 
 // when ticker arrive which mean it is time to callupdate , the to_update_call will be triggered
 // in which you put your real update code there
 func NewPackageClient(token string, package_id int, current_version string,
-	sync_interval_secs_remote bool, to_update_call func(*PackageClient, *Msg_resp_app_version, error), auto_update_log_callback func(logstr string)) (*PackageClient, error) {
+	sync_interval_secs_remote bool, to_update_call func(*PackageClient, *Msg_resp_app_version, error) bool, auto_update_log_callback func(logstr string)) (*PackageClient, error) {
 
 	if to_update_call == nil {
 		return nil, errors.New("to_update_call required")
@@ -63,10 +63,21 @@ func (pc *PackageClient) Log(logstr string) *PackageClient {
 func (pc *PackageClient) Update() *PackageClient {
 	pc.last_update_unixtime = time.Now().Unix()
 	app_v, app_v_err := pc.GetRemoteAppVersion()
-	if app_v_err == nil && pc.sync_interval_secs_remote {
-		pc.auto_update_interval_secs = app_v.Update_secs
+
+	if app_v_err == nil {
+
+		if pc.sync_interval_secs_remote {
+			pc.auto_update_interval_secs = app_v.Update_secs
+		}
+
+		if app_v.Version != pc.Current_version {
+			update_success := pc.auto_update_func(pc, app_v, app_v_err)
+			if update_success {
+				pc.Current_version = app_v.Version
+			}
+		}
 	}
-	pc.auto_update_func(pc, app_v, app_v_err)
+
 	return pc
 }
 
