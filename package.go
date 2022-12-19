@@ -95,7 +95,7 @@ func (pc *PackageClient) Update() error {
 				return update_error
 			}
 		} else {
-			pc.ErrLog("remote version same to local version, remote v:" + app_v.Version)
+			pc.Log("remote version same to local version, remote v:" + app_v.Version)
 			return nil
 		}
 	} else {
