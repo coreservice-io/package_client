@@ -67,14 +67,24 @@ func (pc *PackageClient) Update() *PackageClient {
 	if app_v_err == nil {
 
 		if pc.sync_interval_secs_remote {
+			pc.Log("sync remote auto_update_secs to local")
 			pc.auto_update_interval_secs = app_v.Update_secs
+		} else {
+			pc.Log("use local auto_update_secs instead of using remote ")
 		}
 
 		if app_v.Version != pc.Current_version {
+			pc.Log("remote v:" + app_v.Version + " ,local v:" + pc.Current_version)
+			pc.Log("update function to call")
 			update_success := pc.auto_update_func(pc, app_v, app_v_err)
 			if update_success {
+				pc.Log("update function success ,local version updated")
 				pc.Current_version = app_v.Version
+			} else {
+				pc.Log("update function failed ,local version won't get updated")
 			}
+		} else {
+			pc.Log("remote version same to local version, remote v:" + app_v.Version)
 		}
 	}
 
