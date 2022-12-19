@@ -19,17 +19,18 @@ type PackageClient struct {
 	sync_interval_secs_remote bool
 	last_update_unixtime      int64
 
-	to_stop                  chan struct{}
-	auto_update_running      bool
-	auto_update_running_lock sync.Mutex
-	auto_update_func         func(*PackageClient, *Msg_resp_app_version, error) error
-	auto_update_log_callback func(logstr string)
+	to_stop                      chan struct{}
+	auto_update_running          bool
+	auto_update_running_lock     sync.Mutex
+	auto_update_func             func(*PackageClient, *Msg_resp_app_version) error
+	auto_update_log_callback     func(logstr string)
+	auto_update_err_log_callback func(logstr string)
 }
 
 // when ticker arrive which mean it is time to callupdate , the to_update_call will be triggered
 // in which you put your real update code there
 func NewPackageClient(token string, package_id int, current_version string,
-	sync_interval_secs_remote bool, to_update_call func(*PackageClient, *Msg_resp_app_version, error) error, auto_update_log_callback func(logstr string)) (*PackageClient, error) {
+	sync_interval_secs_remote bool, to_update_call func(*PackageClient, *Msg_resp_app_version) error, auto_update_log_callback func(logstr string), auto_update_err_log_callback func(logstr string)) (*PackageClient, error) {
 
 	if to_update_call == nil {
 		return nil, errors.New("to_update_call required")
@@ -41,21 +42,29 @@ func NewPackageClient(token string, package_id int, current_version string,
 		return nil, err
 	}
 	return &PackageClient{
-		Package_id:                package_id,
-		Token:                     token,
-		Current_version:           current_version,
-		auto_update_interval_secs: DEFAULT_AUTO_UPDATE_INTERVAL_SECS,
-		auto_update_func:          to_update_call,
-		auto_update_log_callback:  auto_update_log_callback,
-		last_update_unixtime:      0,
-		sync_interval_secs_remote: sync_interval_secs_remote,
-		to_stop:                   make(chan struct{}),
+		Package_id:                   package_id,
+		Token:                        token,
+		Current_version:              current_version,
+		auto_update_interval_secs:    DEFAULT_AUTO_UPDATE_INTERVAL_SECS,
+		auto_update_func:             to_update_call,
+		auto_update_log_callback:     auto_update_log_callback,
+		auto_update_err_log_callback: auto_update_err_log_callback,
+		last_update_unixtime:         0,
+		sync_interval_secs_remote:    sync_interval_secs_remote,
+		to_stop:                      make(chan struct{}),
 	}, nil
 }
 
 func (pc *PackageClient) Log(logstr string) *PackageClient {
 	if pc.auto_update_log_callback != nil {
 		pc.auto_update_log_callback(logstr)
+	}
+	return pc
+}
+
+func (pc *PackageClient) ErrLog(logstr string) *PackageClient {
+	if pc.auto_update_err_log_callback != nil {
+		pc.auto_update_err_log_callback(logstr)
 	}
 	return pc
 }
@@ -76,20 +85,21 @@ func (pc *PackageClient) Update() error {
 		if app_v.Version != pc.Current_version {
 			pc.Log("remote v:" + app_v.Version + " ,local v:" + pc.Current_version)
 			pc.Log("update function to call")
-			update_error := pc.auto_update_func(pc, app_v, app_v_err)
+			update_error := pc.auto_update_func(pc, app_v)
 			if update_error == nil {
 				pc.Log("update function success ,local version updated")
 				pc.Current_version = app_v.Version
 				return nil
 			} else {
-				pc.Log("update function failed ,local version won't get updated")
+				pc.ErrLog("update function failed ,local version won't get updated,error:" + update_error.Error())
 				return update_error
 			}
 		} else {
-			pc.Log("remote version same to local version, remote v:" + app_v.Version)
+			pc.ErrLog("remote version same to local version, remote v:" + app_v.Version)
 			return nil
 		}
 	} else {
+		pc.ErrLog("GetRemoteAppVersion error:" + app_v_err.Error())
 		return app_v_err
 	}
 }
