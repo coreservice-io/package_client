@@ -37,7 +37,7 @@ func NewPackageClient(token string, package_id int, current_version string,
 	}
 
 	//test version api correct
-	_, err := GetRemoteAppVersion(token, package_id)
+	_, err := GetAppVersion(token, package_id, false)
 	if err != nil {
 		return nil, err
 	}
@@ -159,5 +159,5 @@ func (pc *PackageClient) DecodeAppDetail(app_v *Msg_resp_app_version, decode_obj
 }
 
 func (pc *PackageClient) GetRemoteAppVersion() (*Msg_resp_app_version, error) {
-	return GetRemoteAppVersion(pc.Token, pc.Package_id)
+	return GetAppVersion(pc.Token, pc.Package_id, false)
 }

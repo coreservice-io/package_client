@@ -4,6 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"strconv"
+	"sync"
+
+	"github.com/coreservice-io/job"
 )
 
 //api meta
@@ -47,7 +50,7 @@ type AppDetail_Standard struct {
 // decode_pointer is the adress of your unmarshal object
 func GetRemoteAppDetail(token string, package_id int, decode_object interface{}) error {
 
-	v_result, v_err := GetRemoteAppVersion(token, package_id)
+	v_result, v_err := GetAppVersion(token, package_id, false)
 	if v_err != nil {
 		return v_err
 	}
@@ -60,7 +63,7 @@ func GetRemoteAppDetail(token string, package_id int, decode_object interface{})
 	return nil
 }
 
-func GetRemoteAppVersion(token string, package_id int) (*Msg_resp_app_version, error) {
+func getAppVersionFromRemote(token string, package_id int) (*Msg_resp_app_version, error) {
 
 	// request app version info
 	request_url := PACKAGE_SERVICE_URL + "/api/version/"
@@ -89,4 +92,93 @@ func GetRemoteAppVersion(token string, package_id int) (*Msg_resp_app_version, e
 	}
 
 	return result, nil
+}
+
+type CacheTarget struct {
+	Token      string
+	Package_id int
+	Response   *Msg_resp_app_version
+}
+
+var CacheJobs sync.Map //make(map[string]*CacheTarget, 0)
+
+func GetAppVersion(token string, package_id int, from_cache bool) (*Msg_resp_app_version, error) {
+	key := strconv.Itoa(package_id) + ":" + token
+
+	if from_cache {
+		ct_i, exist := CacheJobs.LoadOrStore(key, &CacheTarget{
+			Token:      token,
+			Package_id: package_id,
+			Response:   nil,
+		})
+
+		if exist && ct_i.(*CacheTarget).Response != nil {
+			return ct_i.(*CacheTarget).Response, nil
+		}
+	}
+
+	//get from remote
+	//insert job for background todo
+	CacheJobs.LoadOrStore(key, &CacheTarget{
+		Token:      token,
+		Package_id: package_id,
+		Response:   nil,
+	})
+
+	remote_response, err := getAppVersionFromRemote(token, package_id)
+	if err != nil {
+		return nil, err
+	} else {
+		CacheJobs.Store(key, &CacheTarget{
+			Token:      token,
+			Package_id: package_id,
+			Response:   remote_response,
+		})
+	}
+
+	return remote_response, nil
+}
+
+const CACHE_REFRESH_INTERVAL_SECS = 120 //2min
+
+var cache_refresh_job_running bool = false
+
+func StartCacheRefreshJob() {
+
+	if cache_refresh_job_running {
+		return
+	} else {
+		cache_refresh_job_running = true
+	}
+
+	job.Start(
+		"cache_refresh",
+		// job process
+		func() {
+			CacheJobs.Range(func(k, v interface{}) bool {
+				t := v.(*CacheTarget)
+				GetAppVersion(t.Token, t.Package_id, false)
+				return true
+			})
+		},
+		// onPanic callback, run if panic happened
+		func(err interface{}) {
+		},
+		// job interval in seconds
+		CACHE_REFRESH_INTERVAL_SECS,
+		// job type
+		// job.TYPE_PANIC_REDO  auto restart if panic
+		// job.TYPE_PANIC_RETURN  stop if panic
+		job.TYPE_PANIC_REDO,
+		// check continue callback, the job will stop running if return false
+		// the job will keep running if this callback is nil
+		func(job *job.Job) bool {
+			return true
+		},
+		// onFinish callback
+		func(inst *job.Job) {
+
+		},
+	)
+
 }
