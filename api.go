@@ -31,9 +31,10 @@ func (apim *API_META_STATUS) MetaStatus(status int, message string) {
 // @Description Msg_resp_app
 type Msg_resp_app_version struct {
 	API_META_STATUS
-	Version     string `json:"version"`
-	Content     string `json:"content"`
-	Update_secs int64  `json:"update_secs"`
+	Version               string `json:"version"`
+	Content               string `json:"content"`
+	Update_secs           int64  `json:"update_secs"`
+	Minimum_allow_version string `json:"minimum_allow_version"`
 }
 
 type AppDetail_Standard struct {
@@ -75,6 +76,11 @@ func GetRemoteAppVersion(token string, package_id int) (*Msg_resp_app_version, e
 	}
 	if result.Meta_status <= 0 {
 		return nil, errors.New("get app version error:" + result.Meta_message + " , package_id:" + strconv.Itoa(package_id))
+	}
+
+	//check min-allow version format
+	if _, v_err := ParseVersion(result.Minimum_allow_version); v_err != nil {
+		return nil, errors.New("minimum_allow_version format err, minimum_allow_version:" + result.Minimum_allow_version)
 	}
 
 	return result, nil

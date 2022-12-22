@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -123,4 +124,83 @@ func DownloadFile(save_filepath string, download_url string, filehash string) er
 	}
 
 	return nil
+}
+
+type Version struct {
+	Head int
+	Mid  int
+	Tail int
+}
+
+func ParseVersion(v string) (*Version, error) {
+	v = strings.TrimSpace(v)
+	v = strings.ToLower(v)
+	v = strings.TrimPrefix(v, "v")
+
+	aVersion := strings.Split(v, ".")
+	if len(aVersion) != 3 {
+		return nil, errors.New("version format error")
+	}
+
+	result := &Version{}
+
+	head, err_head := strconv.Atoi(aVersion[0])
+	if err_head != nil {
+		return nil, err_head
+	} else {
+		result.Head = head
+	}
+
+	mid, err_mid := strconv.Atoi(aVersion[1])
+	if err_mid != nil {
+		return nil, err_mid
+	} else {
+		result.Mid = mid
+	}
+
+	tail, err_tail := strconv.Atoi(aVersion[2])
+	if err_tail != nil {
+		return nil, err_tail
+	} else {
+		result.Tail = tail
+	}
+
+	return result, nil
+}
+
+func version_num_compare(a_int int, b_int int) int {
+	if a_int > b_int {
+		return 1
+	} else if a_int < b_int {
+		return -1
+	} else {
+		return 0
+	}
+}
+
+// VersionCompare
+// compare version (x.x.x)
+// a>b return 1
+// a==b return 0
+// a<b  return -1
+func VersionCompare(a, b string) (int, error) {
+	a_v, a_err := ParseVersion(a)
+	if a_err != nil {
+		return 0, a_err
+	}
+
+	b_v, b_err := ParseVersion(b)
+	if b_err != nil {
+		return 0, b_err
+	}
+
+	if c_h := version_num_compare(a_v.Head, b_v.Head); c_h == 0 {
+		if c_m := version_num_compare(a_v.Mid, b_v.Mid); c_m == 0 {
+			return version_num_compare(a_v.Tail, b_v.Tail), nil
+		} else {
+			return c_m, nil
+		}
+	} else {
+		return c_h, nil
+	}
 }
