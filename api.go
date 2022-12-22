@@ -78,9 +78,14 @@ func GetRemoteAppVersion(token string, package_id int) (*Msg_resp_app_version, e
 		return nil, errors.New("get app version error:" + result.Meta_message + " , package_id:" + strconv.Itoa(package_id))
 	}
 
+	//check  version format
+	if _, v_err := ParseVersion(result.Version); v_err != nil {
+		return nil, errors.New("version format err:" + v_err.Error() + ", version:" + result.Version)
+	}
+
 	//check min-allow version format
-	if _, v_err := ParseVersion(result.Minimum_allow_version); v_err != nil {
-		return nil, errors.New("minimum_allow_version format err, minimum_allow_version:" + result.Minimum_allow_version)
+	if _, v_min_err := ParseVersion(result.Minimum_allow_version); v_min_err != nil {
+		return nil, errors.New("minimum_allow_version format err:" + v_min_err.Error() + ", minimum_allow_version:" + result.Minimum_allow_version)
 	}
 
 	return result, nil
