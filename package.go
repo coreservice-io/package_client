@@ -69,7 +69,8 @@ func (pc *PackageClient) ErrLog(logstr string) *PackageClient {
 	return pc
 }
 
-func (pc *PackageClient) Update() error {
+// when ignore_version ==true, will always do update
+func (pc *PackageClient) Update(ignore_version bool) error {
 	pc.last_update_unixtime = time.Now().Unix()
 	app_v, app_v_err := pc.GetRemoteAppVersion()
 
@@ -82,7 +83,7 @@ func (pc *PackageClient) Update() error {
 			pc.Log("use local auto_update_secs instead of using remote ")
 		}
 
-		if app_v.Version != pc.Current_version {
+		if app_v.Version != pc.Current_version || ignore_version {
 			pc.Log("remote v:" + app_v.Version + " ,local v:" + pc.Current_version)
 			pc.Log("update function to call")
 			update_error := pc.auto_update_func(pc, app_v)
@@ -125,7 +126,7 @@ func (pc *PackageClient) StartAutoUpdate() error {
 			select {
 			case <-time.After(DEFAULT_AUTO_UPDATE_INTERVAL_SECS_MIN * time.Second):
 				if time.Now().Unix()-pc.last_update_unixtime > pc.auto_update_interval_secs {
-					pc.Update()
+					pc.Update(false)
 				}
 			case <-pc.to_stop:
 				return
