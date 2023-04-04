@@ -1,6 +1,7 @@
 package package_client
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"strconv"
@@ -152,6 +153,7 @@ func StartCacheRefreshJob() {
 	}
 
 	job.Start(
+		context.Background(),
 		"cache_refresh",
 		// job type
 		// job.TYPE_PANIC_REDO  auto restart if panic
