@@ -152,29 +152,20 @@ func StartCacheRefreshJob() {
 		cache_refresh_job_running = true
 	}
 
-	job.Start(
-		context.Background(),
-		"cache_refresh",
-		// job type
-		// job.TYPE_PANIC_REDO  auto restart if panic
-		// job.TYPE_PANIC_RETURN  stop if panic
-		job.TYPE_PANIC_REDO,
-		// job interval in seconds
-		CACHE_REFRESH_INTERVAL_SECS,
-		nil,
-		nil,
-		// job process
-		func(j *job.Job) {
+	job.Start(context.Background(), job.JobConfig{
+		Name:          "cache_refresh",
+		Job_type:      job.TYPE_PANIC_REDO,
+		Interval_secs: CACHE_REFRESH_INTERVAL_SECS,
+		Process_fn: func(j *job.Job) {
 			CacheJobs.Range(func(k, v interface{}) bool {
 				t := v.(*CacheTarget)
 				GetAppVersion(t.Token, t.Package_id, false)
 				return true
 			})
 		},
-		// onPanic callback, run if panic happened
-		func(j *job.Job, err interface{}) {
+		On_panic: func(job *job.Job, panic_err interface{}) {
+
 		},
-		nil,
-	)
+	}, nil)
 
 }
