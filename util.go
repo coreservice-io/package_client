@@ -52,19 +52,20 @@ func UnZipTo(zipfile_path string, Folder string, to_delete_zipfile bool) error {
 			return errors.New("unzipTo file error:" + err.Error())
 		}
 
-		arr := strings.Split(h.Name, "/")
-		nameArr := []string{}
-		for _, v := range arr {
-			if v != "" {
-				nameArr = append(nameArr, v)
-			}
-		}
-		if len(nameArr) <= 1 {
-			continue
-		}
-		name := filepath.Join(nameArr[1:]...)
+		// arr := strings.Split(h.Name, "/")
+		// nameArr := []string{}
+		// for _, v := range arr {
+		// 	if v != "" {
+		// 		nameArr = append(nameArr, v)
+		// 	}
+		// }
+		// if len(nameArr) <= 1 {
+		// 	continue
+		// }
+		// name := filepath.Join(nameArr[1:]...)
 
-		filePath := filepath.Join(Folder, name)
+		// filePath := filepath.Join(Folder, name)
+		filePath := filepath.Join(Folder, h.Name)
 		if h.FileInfo().IsDir() {
 			err = os.MkdirAll(filePath, 0777)
 			if err != nil {
