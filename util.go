@@ -2,7 +2,6 @@ package package_client
 
 import (
 	"archive/tar"
-	"bytes"
 	"compress/gzip"
 	"crypto/sha256"
 	"encoding/hex"
@@ -23,22 +22,22 @@ func SHA256(input []byte) []byte {
 
 func UnZipTo(zipfile_path string, Folder string, to_delete_zipfile bool) error {
 
-	content, err := os.ReadFile(zipfile_path) // just pass the file name
+	f, err := os.Open(zipfile_path)
 	if err != nil {
 		return err
 	}
+	defer f.Close()
 
 	// unzip to temp folder
-	err = os.MkdirAll(Folder, 0777)
+	err = os.MkdirAll(Folder, 0755)
 	if err != nil {
-		return errors.New("unzipTo os.MkdirAll err :" + err.Error() + " , filePath" + Folder)
+		return fmt.Errorf("unzipTo os.MkdirAll err:%s, filePath:%s", err.Error(), Folder)
 	}
 
 	// gzip read
-	body := bytes.NewReader(content)
-	gr, err := gzip.NewReader(body)
+	gr, err := gzip.NewReader(f)
 	if err != nil {
-		return errors.New("unzipTo gzip read file error:" + err.Error())
+		return fmt.Errorf("unzipTo gzip read file err:%s", err.Error())
 	}
 	defer gr.Close()
 	// tar read
@@ -49,41 +48,28 @@ func UnZipTo(zipfile_path string, Folder string, to_delete_zipfile bool) error {
 			break
 		}
 		if err != nil {
-			return errors.New("unzipTo file error:" + err.Error())
+			return fmt.Errorf("unzipTo file err:%s", err.Error())
 		}
 
-		// arr := strings.Split(h.Name, "/")
-		// nameArr := []string{}
-		// for _, v := range arr {
-		// 	if v != "" {
-		// 		nameArr = append(nameArr, v)
-		// 	}
-		// }
-		// if len(nameArr) <= 1 {
-		// 	continue
-		// }
-		// name := filepath.Join(nameArr[1:]...)
-
-		// filePath := filepath.Join(Folder, name)
 		filePath := filepath.Join(Folder, h.Name)
 		if h.FileInfo().IsDir() {
-			err = os.MkdirAll(filePath, 0777)
-			if err != nil {
-				return errors.New("unzipTo os.MkdirAll err:" + err.Error() + "filePath:" + filePath)
+			if err = os.MkdirAll(filePath, 0755); err != nil {
+				return fmt.Errorf("unzipTo os.MkdirAll err:%s filePath:%s", err.Error(), filePath)
 			}
 			continue
 		}
 
-		file_content, err := io.ReadAll(tr)
+		fw, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.FileMode(h.Mode))
 		if err != nil {
-			return errors.New("unzipTo io.ReadAll err:" + err.Error() + " , filePath:" + filePath)
+			return fmt.Errorf("Error creating:%s, err:%s", filePath, err.Error())
+		}
+		if _, err := io.Copy(fw, tr); err != nil {
+			return err
 		}
 
-		err = os.WriteFile(filePath, file_content, 0777)
-		if err != nil {
-			return errors.New("Error creating :" + filePath + ", err:" + err.Error())
-		}
-
+		// manually close here after each file operation; defering would cause each file close
+		// to wait until all operations have completed.
+		fw.Close()
 	}
 
 	if to_delete_zipfile {
@@ -109,7 +95,7 @@ func DownloadFile(save_filepath string, download_url string, filehash string) er
 
 	file_content, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return errors.New("download_file io.ReadAll err:" + err.Error() + " , download_url:" + download_url)
+		return fmt.Errorf("download_file io.ReadAll err:%s , download_url:%s", err.Error(), download_url)
 	}
 
 	// check hash
@@ -121,7 +107,7 @@ func DownloadFile(save_filepath string, download_url string, filehash string) er
 
 	err = os.WriteFile(save_filepath, file_content, 0777)
 	if err != nil {
-		return errors.New("download_file Error creating:" + save_filepath + ", err:" + err.Error())
+		return fmt.Errorf("download_file Error creating:%s, err:%s", save_filepath, err.Error())
 	}
 
 	return nil
